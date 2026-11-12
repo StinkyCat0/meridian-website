@@ -17,6 +17,7 @@
     "start": "npm run start -w @meridian/website-api",
     "test": "npm run test -w @meridian/website-api",
     "lint": "npm run lint -w @meridian/website-web",
+    "verify": "npm run lint && npm test && npm run build",
     "deploy": "bash scripts/deploy.sh"
   },
   "devDependencies": {
