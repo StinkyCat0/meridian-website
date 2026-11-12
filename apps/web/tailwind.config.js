@@ -1,4 +1,15 @@
-/** @type {import('tailwindcss').Config} */
+/**
+ * Loaded through `@config "../tailwind.config.js"` in src/index.css because
+ * Tailwind CSS 4 no longer auto-detects JavaScript config files.
+ *
+ * The v4 legacy bridge maps these v3 theme keys to CSS variables, so no key
+ * needs to move into `@theme`. In particular, `backdropBlur.sm` becomes
+ * `--backdrop-blur-sm`, which keeps the existing `backdrop-blur-sm` classes
+ * at 4px (v4's default `blur-sm` scale is 8px). The `content` globs are
+ * additive to v4's automatic source detection.
+ *
+ * @type {import('tailwindcss').Config}
+ */
 export default {
   content: [
     "./index.html",
