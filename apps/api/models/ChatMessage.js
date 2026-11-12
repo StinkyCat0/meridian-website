@@ -150,10 +150,11 @@ chatMessageSchema.statics.findByRoom = async function(roomId, options = {}) {
     populateUser = true 
   } = options;
   
-  const query = { roomId };
-  if (!includeReplies) {
-    query.parentId = { $exists: false };
-  }
+  // Always page over top-level messages; replies must never consume the limit
+  // or leak into the top-level list.
+  // `null` matches both missing and explicitly-null parentId values so
+  // legacy top-level messages stay visible.
+  const query = { roomId, parentId: null };
   if (before) {
     query.createdAt = { $lt: new Date(before) };
   }
@@ -165,31 +166,33 @@ chatMessageSchema.statics.findByRoom = async function(roomId, options = {}) {
   }
   
   const messages = await chain.lean();
+  const topLevel = messages.slice().reverse();
   
-  // If including replies, fetch and group them
-  if (includeReplies) {
-    const topLevel = messages.filter(m => !m.parentId);
-    const parentIds = topLevel.map(m => m._id);
-    
-    if (parentIds.length > 0) {
-      const replies = await this.find({ 
-        roomId, 
-        parentId: { $in: parentIds } 
-      })
-      .populate('userId', 'name avatar')
-      .sort({ createdAt: 1 })
-      .lean();
-      
-      // Group replies under parents
-      return topLevel.map(msg => ({
-        ...msg,
-        replies: replies.filter(r => r.parentId?.toString() === msg._id.toString()),
-        replyCount: replies.filter(r => r.parentId?.toString() === msg._id.toString()).length
-      })).reverse();
-    }
+  if (!includeReplies || topLevel.length === 0) {
+    return topLevel;
   }
   
-  return messages.reverse();
+  const parentIds = topLevel.map(m => m._id);
+  let replyChain = this.find({ roomId, parentId: { $in: parentIds } })
+    .sort({ createdAt: 1 });
+  
+  if (populateUser) {
+    replyChain = replyChain.populate('userId', 'name avatar role');
+  }
+  
+  const replies = await replyChain.lean();
+  
+  // Group replies under parents (each thread keeps its oldest-first order)
+  return topLevel.map(msg => {
+    const threadReplies = replies.filter(
+      r => r.parentId?.toString() === msg._id.toString()
+    );
+    return {
+      ...msg,
+      replies: threadReplies,
+      replyCount: threadReplies.length,
+    };
+  });
 };
 
 module.exports = mongoose.model('ChatMessage', chatMessageSchema);
