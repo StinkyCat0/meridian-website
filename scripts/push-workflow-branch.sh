@@ -86,6 +86,7 @@ echo "Registered temporary deploy key $KEY_ID on $OWNER/$REPO."
 echo "The key exists only for this push and is deleted when the script exits."
 
 export GIT_SSH_COMMAND="ssh -i \"$KEY\" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new"
+git fetch --quiet origin "refs/heads/$BRANCH:refs/remotes/origin/$BRANCH" || true
 git push --force-with-lease "git@github.com:$OWNER/$REPO.git" -- "refs/heads/$BRANCH:refs/heads/$BRANCH"
 
 echo "Pushed '$BRANCH' with the temporary key; deleting it now."
