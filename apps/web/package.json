@@ -14,7 +14,7 @@
     "framer-motion": "^10.18.0",
     "lucide-react": "^0.474.0",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1",
+    "react-dom": "^19.3.1",
     "react-router-dom": "^7.13.1",
     "socket.io-client": "^4.8.3",
     "tailwind-merge": "^1.14.0"
