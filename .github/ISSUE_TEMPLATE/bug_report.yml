@@ -1,0 +1,39 @@
+name: Bug report
+description: A reproducible defect in the website or API
+title: 'bug: '
+labels: [bug]
+body:
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Reproduce
+      placeholder: |
+        1. Open ...
+        2. Submit ...
+        3. Observe ...
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options: [Web, API, Both, Deployment]
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence
+      description: Response body, console error, request id, or exact command output.
