@@ -1,0 +1,26 @@
+{
+  "name": "meridian-website",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Meridian Studios public website and customer-facing API.",
+  "workspaces": [
+    "apps/*"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "concurrently -k -n api,web -c cyan,magenta \"npm:dev:api\" \"npm:dev:web\"",
+    "dev:api": "npm run dev -w @meridian/website-api",
+    "dev:web": "npm run dev -w @meridian/website-web",
+    "build": "npm run build -w @meridian/website-web",
+    "start": "npm run start -w @meridian/website-api",
+    "test": "npm run test -w @meridian/website-api",
+    "lint": "npm run lint -w @meridian/website-web",
+    "deploy": "bash scripts/deploy.sh"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "prettier": "^3.4.2"
+  }
+}
