@@ -1,0 +1,278 @@
+name: Deploy production
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Git ref (branch, tag, or commit SHA) to deploy
+        required: false
+        default: main
+        type: string
+      install_dependencies:
+        description: Run npm ci on the host before reloading PM2
+        required: false
+        default: false
+        type: boolean
+      reload_nginx:
+        description: Validate and reload nginx (requires passwordless sudo; never edits config)
+        required: false
+        default: false
+        type: boolean
+      reason:
+        description: Why this deployment is being made
+        required: true
+        type: string
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy to production
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: production
+    services:
+      mongo:
+        image: mongo:7
+        ports:
+          - 127.0.0.1:27017:27017
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'db.adminCommand({ ping: 1 })'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      TEST_MONGO_URI: mongodb://127.0.0.1:27017/meridian_website_test
+    steps:
+      - name: Record deployment reason
+        env:
+          DEPLOY_REF: ${{ inputs.ref }}
+          DEPLOY_REASON: ${{ inputs.reason }}
+        run: |
+          printf 'Deploying %s: %s\n' "$DEPLOY_REF" "$DEPLOY_REASON"
+
+      - name: Validate required secrets
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          missing=()
+          for name in DEPLOY_HOST DEPLOY_USER DEPLOY_SSH_KEY DEPLOY_KNOWN_HOSTS; do
+            if [ -z "$(printenv "$name" || true)" ]; then
+              missing+=("$name")
+            fi
+          done
+          if [ "${#missing[@]}" -ne 0 ]; then
+            echo "::error::Missing required secrets: ${missing[*]}"
+            exit 1
+          fi
+
+      - name: Checkout requested ref
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Test API
+        run: npm test
+
+      - name: Build web
+        run: npm run build
+
+      - name: Upload web build
+        uses: actions/upload-artifact@v7
+        with:
+          name: web-dist
+          path: apps/web/dist
+          retention-days: 7
+
+      - name: Configure SSH
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          umask 077
+          key="$RUNNER_TEMP/deploy_key"
+          known="$RUNNER_TEMP/deploy_known_hosts"
+          printf '%s\n' "$DEPLOY_SSH_KEY" > "$key"
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > "$known"
+          chmod 600 "$key"
+          chmod 600 "$known"
+          {
+            echo "DEPLOY_KEY=$key"
+            echo "DEPLOY_KNOWN_HOSTS_FILE=$known"
+          } >> "$GITHUB_ENV"
+
+      - name: Upload source over SSH
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+        run: |
+          port="${DEPLOY_PORT:-22}"
+          deploy_path="${DEPLOY_PATH:-/home/ssourin/meridian-project}"
+          ssh_opts=(-i "$DEPLOY_KEY" -o IdentitiesOnly=yes -o BatchMode=yes
+            -o UserKnownHostsFile="$DEPLOY_KNOWN_HOSTS_FILE"
+            -o StrictHostKeyChecking=yes -p "$port")
+          rsync -az --delete --delay-updates \
+            -e "ssh ${ssh_opts[*]}" \
+            --exclude='.env' \
+            --exclude='.env.*' \
+            --exclude='.git' \
+            --exclude='node_modules' \
+            --exclude='uploads' \
+            --exclude='logs' \
+            --exclude='dist' \
+            ./ "$DEPLOY_USER@$DEPLOY_HOST:$deploy_path/"
+
+      - name: Download web build
+        uses: actions/download-artifact@v7
+        with:
+          name: web-dist
+          path: ${{ runner.temp }}/web-dist
+
+      - name: Publish web build over SSH
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+          WEB_ROOT: ${{ secrets.WEB_ROOT }}
+        run: |
+          port="${DEPLOY_PORT:-22}"
+          web_root="${WEB_ROOT:-/usr/share/nginx/meridianstudios.org}"
+          ssh_opts=(-i "$DEPLOY_KEY" -o IdentitiesOnly=yes -o BatchMode=yes
+            -o UserKnownHostsFile="$DEPLOY_KNOWN_HOSTS_FILE"
+            -o StrictHostKeyChecking=yes -p "$port")
+          rsync -az --delete --delay-updates \
+            -e "ssh ${ssh_opts[*]}" \
+            --exclude='.env' \
+            --exclude='uploads' \
+            "$RUNNER_TEMP/web-dist/" "$DEPLOY_USER@$DEPLOY_HOST:$web_root/"
+
+      - name: Reload API and check health
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+          PM2_NAME: ${{ secrets.PM2_NAME }}
+          API_PORT: ${{ secrets.API_PORT }}
+          INSTALL_DEPS: ${{ inputs.install_dependencies }}
+          RELOAD_NGINX: ${{ inputs.reload_nginx }}
+        run: |
+          port="${DEPLOY_PORT:-22}"
+          deploy_path="${DEPLOY_PATH:-/home/ssourin/meridian-project}"
+          pm2_name="${PM2_NAME:-meridian-backend}"
+          api_port="${API_PORT:-2000}"
+          ssh_opts=(-i "$DEPLOY_KEY" -o IdentitiesOnly=yes -o BatchMode=yes
+            -o UserKnownHostsFile="$DEPLOY_KNOWN_HOSTS_FILE"
+            -o StrictHostKeyChecking=yes -p "$port")
+          remote_cmd="bash -s -- $(printf '%q ' \
+            "$deploy_path" "$pm2_name" "$api_port" "$INSTALL_DEPS" "$RELOAD_NGINX")"
+          ssh "${ssh_opts[@]}" "$DEPLOY_USER@$DEPLOY_HOST" "$remote_cmd" <<'REMOTE'
+          set -euo pipefail
+          deploy_path="${1:?deploy path required}"
+          pm2_name="${2:?pm2 name required}"
+          api_port="${3:-2000}"
+          install_deps="${4:-false}"
+          reload_nginx="${5:-false}"
+
+          cd "$deploy_path"
+          expected_script="$(pwd -P)/apps/api/server.js"
+          ecosystem="$(pwd -P)/deploy/pm2/ecosystem.config.cjs"
+
+          test -f "$expected_script"
+          node --check "$expected_script"
+          if [ ! -f "$ecosystem" ]; then
+            echo "::error::PM2 ecosystem config missing: $ecosystem"
+            exit 1
+          fi
+          node --check "$ecosystem"
+
+          if [ "$install_deps" = "true" ]; then
+            echo "==> Installing production dependencies"
+            npm ci --omit=dev
+          fi
+
+          if ! command -v pm2 >/dev/null 2>&1; then
+            echo "::error::pm2 is not installed or not on PATH for this user"
+            exit 1
+          fi
+
+          current_script="$(
+            pm2 jlist 2>/dev/null | node -e '
+              let raw = "";
+              process.stdin.setEncoding("utf8");
+              process.stdin.on("data", (chunk) => { raw += chunk; });
+              process.stdin.on("end", () => {
+                try {
+                  const proc = JSON.parse(raw).find((entry) => entry.name === process.argv[1]);
+                  process.stdout.write((proc && proc.pm2_env && proc.pm2_env.pm_exec_path) || "");
+                } catch {
+                  process.stdout.write("");
+                }
+              });
+            ' "$pm2_name" || true
+          )" || true
+
+          if [ "$current_script" = "$expected_script" ]; then
+            echo "==> Reloading PM2 process $pm2_name"
+            NODE_ENV=production HOST=127.0.0.1 PORT="$api_port" TRUST_PROXY=1 \
+              pm2 reload "$pm2_name" --update-env \
+              || NODE_ENV=production HOST=127.0.0.1 PORT="$api_port" TRUST_PROXY=1 \
+                pm2 restart "$pm2_name" --update-env
+          else
+            if [ -n "$current_script" ]; then
+              echo "==> Migrating PM2 process $pm2_name (was: $current_script)"
+            else
+              echo "==> Starting PM2 process $pm2_name from $ecosystem"
+            fi
+            if pm2 describe "$pm2_name" >/dev/null 2>&1; then
+              pm2 delete "$pm2_name"
+            fi
+            pm2 start "$ecosystem" --only "$pm2_name" --env production
+          fi
+
+          healthy=0
+          for _ in $(seq 1 20); do
+            code="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 2 \
+              "http://127.0.0.1:${api_port}/api/health" 2>/dev/null || true)"
+            if [ "$code" = "200" ]; then
+              healthy=1
+              break
+            fi
+            sleep 1
+          done
+          if [ "$healthy" != "1" ]; then
+            echo "::error::API health check on 127.0.0.1:${api_port} did not return 200 within 20s"
+            exit 1
+          fi
+
+          if ! pm2 save >/dev/null 2>&1; then
+            echo "::warning::pm2 save failed; the process may not be restored after reboot"
+          fi
+
+          if [ "$reload_nginx" = "true" ]; then
+            if ! sudo -n nginx -t; then
+              echo "::error::Passwordless sudo for 'nginx -t' is unavailable; nginx was not reloaded."
+              exit 1
+            fi
+            sudo -n systemctl reload nginx
+          fi
+          REMOTE

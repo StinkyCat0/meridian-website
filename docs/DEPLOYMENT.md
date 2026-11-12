@@ -13,14 +13,14 @@ reviewable files under `deploy/`; the host copies them into place by hand.
 
 ## Topology
 
-| Component | Runs as | Address | Notes |
-| --- | --- | --- | --- |
-| Cloudflare edge | Cloudflare | public 443 | Terminates public TLS and forwards through the tunnel |
-| `cloudflared` | system service on the host | outbound only | Forwards the public request to nginx as plain HTTP on loopback |
-| nginx | system service | `127.0.0.1:80`, `[::1]:80` (tunnel) and `0.0.0.0:443`, `[::]:443` (direct fallback) | No HTTP-to-HTTPS redirect on the tunnel leg |
-| API | PM2 app `meridian-backend` | `127.0.0.1:2000` | One fork process; never bound publicly |
-| SPA | static files in `/usr/share/nginx/meridianstudios.org` | served by nginx | Built from `apps/web` |
-| MongoDB | host or managed service | reachable from the API | Not proxied by nginx |
+| Component       | Runs as                                                | Address                                                                             | Notes                                                          |
+| --------------- | ------------------------------------------------------ | ----------------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| Cloudflare edge | Cloudflare                                             | public 443                                                                          | Terminates public TLS and forwards through the tunnel          |
+| `cloudflared`   | system service on the host                             | outbound only                                                                       | Forwards the public request to nginx as plain HTTP on loopback |
+| nginx           | system service                                         | `127.0.0.1:80`, `[::1]:80` (tunnel) and `0.0.0.0:443`, `[::]:443` (direct fallback) | No HTTP-to-HTTPS redirect on the tunnel leg                    |
+| API             | PM2 app `meridian-backend`                             | `127.0.0.1:2000`                                                                    | One fork process; never bound publicly                         |
+| SPA             | static files in `/usr/share/nginx/meridianstudios.org` | served by nginx                                                                     | Built from `apps/web`                                          |
+| MongoDB         | host or managed service                                | reachable from the API                                                              | Not proxied by nginx                                           |
 
 Public origins are `https://meridianstudios.org` and `https://www.meridianstudios.org`. Browser
 traffic reaches Cloudflare, the tunnel forwards it to nginx on loopback, and nginx proxies the three
@@ -77,7 +77,7 @@ npm run build          # writes apps/web/dist
 
 ```bash
 sudo install -d -o root -g root -m 0755 /usr/share/nginx/meridianstudios.org
-sudo rsync -a --delete apps/web/dist/ /usr/share/nginx/meridianstudios.org/
+rsync -a --delete apps/web/dist/ /usr/share/nginx/meridianstudios.org/
 ```
 
 nginx serves this directory read-only; it must not be writable by the Node process.
@@ -87,11 +87,11 @@ nginx serves this directory read-only; it must not be writable by the Node proce
 The repository ships three files. The two `00-*.conf` files are `http`-context snippets; the site
 file is a `server` block that serves both the tunnel listener and the direct TLS listener.
 
-| Repository file | Install to | Context |
-| --- | --- | --- |
-| `deploy/nginx/00-websocket-upgrade.conf` | `/etc/nginx/conf.d/00-websocket-upgrade.conf` | `http` (defines `$connection_upgrade`) |
-| `deploy/nginx/00-rate-limits.conf` | `/etc/nginx/conf.d/00-rate-limits.conf` | `http` (client-IP maps + `limit_req_zone`s) |
-| `deploy/nginx/meridianstudios.org.conf` | `/etc/nginx/conf.d/meridianstudios.org.conf` | `server` (same `http` include as the `00-*` files) |
+| Repository file                          | Install to                                    | Context                                            |
+| ---------------------------------------- | --------------------------------------------- | -------------------------------------------------- |
+| `deploy/nginx/00-websocket-upgrade.conf` | `/etc/nginx/conf.d/00-websocket-upgrade.conf` | `http` (defines `$connection_upgrade`)             |
+| `deploy/nginx/00-rate-limits.conf`       | `/etc/nginx/conf.d/00-rate-limits.conf`       | `http` (client-IP maps + `limit_req_zone`s)        |
+| `deploy/nginx/meridianstudios.org.conf`  | `/etc/nginx/conf.d/meridianstudios.org.conf`  | `server` (same `http` include as the `00-*` files) |
 
 All three files live in `/etc/nginx/conf.d/`; the `00-` prefixes make nginx parse them before the
 site block. An existing live file at `/etc/nginx/conf.d/meridianstudios.org.conf` is what this
@@ -352,27 +352,40 @@ cd /home/ssourin/meridian-project
 git fetch origin && git checkout <release-sha>
 npm ci
 npm run build
-sudo rsync -a --delete apps/web/dist/ /usr/share/nginx/meridianstudios.org/
+rsync -a --delete apps/web/dist/ /usr/share/nginx/meridianstudios.org/
 pm2 reload meridian-backend --update-env
 curl -fsS https://meridianstudios.org/api/health
 ```
 
-Or use the repository script. Note that its default PM2 name is `meridian-api`, so override it:
+Or use the repository script. Its defaults already match the live host:
 
 ```bash
 WEB_ROOT=/usr/share/nginx/meridianstudios.org PM2_NAME=meridian-backend npm run deploy
 ```
 
-`scripts/deploy.sh` builds the SPA, replaces the web root (rsync, or a `cp -a` fallback), and
-restarts the named PM2 process; if PM2 does not know that name it starts `apps/api/server.js` with
-`--name <name> --cwd apps/api`. It does not touch nginx, does not run migrations, and does not read
-`.env` for you.
+`scripts/deploy.sh` builds the SPA, verifies the staged `index.html`, backs up the previous web
+root, publishes with rsync (or a directory swap fallback), and reloads the PM2 process. If the live
+process still points at the pre-monorepo `backend/server.js` path, it deletes and recreates it from
+`deploy/pm2/ecosystem.config.cjs` only after both files pass `node --check`, then polls the loopback
+health endpoint. It does not touch nginx, does not run migrations, and does not read `.env` for you.
 
-The deployment workflow, when enabled, performs the build/publish/restart steps and starts the app
-from this ecosystem file with `pm2 start deploy/pm2/ecosystem.config.cjs --only meridian-backend`, so
-the app name in the file must stay `meridian-backend`. **The workflow never edits, installs, or
-reloads nginx configuration.** nginx changes are always a separate reviewed host operation with
-`nginx -t`.
+### Manual GitHub Actions deploy
+
+`.github/workflows/deploy.yml` is `workflow_dispatch` only and uses the `production` environment, so
+it cannot deploy on a push. Inputs:
+
+- `ref` (default `main`)
+- `install_dependencies` (default `false`) — run `npm ci --omit=dev` on the host before reload
+- `reload_nginx` (default `false`) — only runs `sudo -n nginx -t` then `sudo -n systemctl reload nginx`; it never edits config
+- `reason` (required)
+
+Required secrets: `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_SSH_KEY`, `DEPLOY_KNOWN_HOSTS`; optional
+`DEPLOY_PORT`, `DEPLOY_PATH`, `WEB_ROOT`, `PM2_NAME`, `API_PORT`. The host key is pinned from the
+known-hosts secret; `StrictHostKeyChecking=no` and `ssh-keyscan` are not used. The first deploy
+migrates `meridian-backend` from the stale `backend/` path to `apps/api`, so review the health check
+and rollback below before dispatching. **The workflow never edits, installs, or reloads nginx
+configuration unless the opt-in validation/reload input is used.** nginx changes remain a separate
+reviewed host operation with `nginx -t`.
 
 ## Rollback
 
@@ -385,7 +398,7 @@ cd /home/ssourin/meridian-project
 git checkout <previous-sha>
 npm ci
 npm run build
-sudo rsync -a --delete apps/web/dist/ /usr/share/nginx/meridianstudios.org/
+rsync -a --delete apps/web/dist/ /usr/share/nginx/meridianstudios.org/
 pm2 reload meridian-backend --update-env
 curl -fsS https://meridianstudios.org/api/health
 ```
@@ -411,15 +424,15 @@ MongoDB backup before a release that changes indexes or data shape.
 
 ## Troubleshooting
 
-| Symptom | Check |
-| --- | --- |
-| 502/504 from nginx | `pm2 status`, `pm2 logs meridian-backend`, `ss -ltnp \| grep 2000`; confirm the API is on `127.0.0.1:2000` |
-| Public site unreachable, origin fine | `systemctl status cloudflared`, `journalctl -u cloudflared`, tunnel ingress configuration |
-| Chat or attachments 404 | `/socket.io/` and `/uploads/` locations present; `pm2 logs`; Socket.IO map installed in `conf.d` |
-| 429 from the public site | Expected on abusive auth/contact/API traffic; inspect `meridianstudios.access.log`, the zones, and the API's own limits. If all clients appear as 127.0.0.1, the `CF-Connecting-IP` map or tunnel headers are wrong |
-| 413 on upload | `client_max_body_size 12m` and the API's 10 MiB attachment cap |
-| WebSocket fails behind the tunnel | Upgrade map installed in `conf.d`, `proxy_http_version 1.1`, `Connection $connection_upgrade`; Cloudflare proxies WebSockets by default |
-| Health 503 | MongoDB unreachable from the API; `/api/health` reports `database: down` |
-| SPA routes 404 | `try_files $uri $uri/ /index.html` and the `root` path |
-| Config rejected | `sudo nginx -t` prints the file/line; the running config is unchanged until a successful reload |
-| Port 80 conflict | Another service or an old default site is bound to 80; this config needs 80 on loopback only |
+| Symptom                              | Check                                                                                                                                                                                                               |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 502/504 from nginx                   | `pm2 status`, `pm2 logs meridian-backend`, `ss -ltnp \| grep 2000`; confirm the API is on `127.0.0.1:2000`                                                                                                          |
+| Public site unreachable, origin fine | `systemctl status cloudflared`, `journalctl -u cloudflared`, tunnel ingress configuration                                                                                                                           |
+| Chat or attachments 404              | `/socket.io/` and `/uploads/` locations present; `pm2 logs`; Socket.IO map installed in `conf.d`                                                                                                                    |
+| 429 from the public site             | Expected on abusive auth/contact/API traffic; inspect `meridianstudios.access.log`, the zones, and the API's own limits. If all clients appear as 127.0.0.1, the `CF-Connecting-IP` map or tunnel headers are wrong |
+| 413 on upload                        | `client_max_body_size 12m` and the API's 10 MiB attachment cap                                                                                                                                                      |
+| WebSocket fails behind the tunnel    | Upgrade map installed in `conf.d`, `proxy_http_version 1.1`, `Connection $connection_upgrade`; Cloudflare proxies WebSockets by default                                                                             |
+| Health 503                           | MongoDB unreachable from the API; `/api/health` reports `database: down`                                                                                                                                            |
+| SPA routes 404                       | `try_files $uri $uri/ /index.html` and the `root` path                                                                                                                                                              |
+| Config rejected                      | `sudo nginx -t` prints the file/line; the running config is unchanged until a successful reload                                                                                                                     |
+| Port 80 conflict                     | Another service or an old default site is bound to 80; this config needs 80 on loopback only                                                                                                                        |

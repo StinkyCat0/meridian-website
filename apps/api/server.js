@@ -121,9 +121,14 @@ async function start() {
   await connectDatabase(uri);
   const { server } = createServer();
   const port = Number.parseInt(process.env.PORT || '2000', 10);
+  // Production sits behind nginx, which is the only public listener; the API
+  // itself must stay loopback unless the operator deliberately overrides HOST.
+  const host =
+    process.env.HOST ||
+    (process.env.NODE_ENV === 'production' ? '127.0.0.1' : '0.0.0.0');
 
-  server.listen(port, () => {
-    console.log(`Meridian website API listening on port ${port}`);
+  server.listen(port, host, () => {
+    console.log(`Meridian website API listening on ${host}:${port}`);
   });
 
   const shutdown = (signal) => {
