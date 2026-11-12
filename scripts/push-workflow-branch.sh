@@ -87,6 +87,12 @@ echo "The key exists only for this push and is deleted when the script exits."
 
 export GIT_SSH_COMMAND="ssh -i \"$KEY\" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new"
 git fetch --quiet origin "refs/heads/$BRANCH:refs/remotes/origin/$BRANCH" || true
-git push --force-with-lease "git@github.com:$OWNER/$REPO.git" -- "refs/heads/$BRANCH:refs/heads/$BRANCH"
+EXPECTED="$(git rev-parse --verify --quiet "refs/remotes/origin/$BRANCH" || true)"
+if [ -n "$EXPECTED" ]; then
+  git push --force-with-lease="refs/heads/$BRANCH:$EXPECTED" \
+    "git@github.com:$OWNER/$REPO.git" -- "refs/heads/$BRANCH:refs/heads/$BRANCH"
+else
+  git push "git@github.com:$OWNER/$REPO.git" -- "refs/heads/$BRANCH:refs/heads/$BRANCH"
+fi
 
 echo "Pushed '$BRANCH' with the temporary key; deleting it now."
