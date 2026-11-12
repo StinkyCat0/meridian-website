@@ -1,15 +1,19 @@
 # Meridian Website
 
+[![CI](https://github.com/StinkyCat0/meridian-website/actions/workflows/ci.yml/badge.svg)](https://github.com/StinkyCat0/meridian-website/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/StinkyCat0/meridian-website/actions/workflows/codeql.yml/badge.svg)](https://github.com/StinkyCat0/meridian-website/actions/workflows/codeql.yml)
+[![PR review](https://github.com/StinkyCat0/meridian-website/actions/workflows/pr-review.yml/badge.svg)](https://github.com/StinkyCat0/meridian-website/actions/workflows/pr-review.yml)
+
 The public Meridian Studios site and the customer-facing API behind it. The marketing site, demo
 sites, account login, password reset, contact form, and support chat live here. Staff operations
 live in [`meridiancrm`](https://github.com/StinkyCat0/meridiancrm); the two repositories talk over a
 small, documented HTTP contract instead of sharing a database or source tree.
 
-| Package  | Purpose                                                                   |
-| -------- | ------------------------------------------------------------------------- |
-| `apps/web` | React 18 + Vite + Tailwind single-page site.                             |
-| `apps/api` | Express 5 + MongoDB API: auth, email verification, contact, live chat.   |
-| `docs`     | Architecture, integration contract, deployment, and review standards.    |
+| Package    | Purpose                                                                |
+| ---------- | ---------------------------------------------------------------------- |
+| `apps/web` | React 18 + Vite + Tailwind single-page site.                           |
+| `apps/api` | Express 5 + MongoDB API: auth, email verification, contact, live chat. |
+| `docs`     | Architecture, integration contract, deployment, and review standards.  |
 
 ## Quickstart
 
@@ -50,15 +54,15 @@ Neither bridge is required to run the site. See [docs/INTEGRATION.md](docs/INTEG
 
 ## Commands
 
-| Command        | Use                                                |
-| -------------- | -------------------------------------------------- |
-| `npm run dev`  | API and Vite in watch mode.                        |
-| `npm run build`| Production web build in `apps/web/dist`.           |
-| `npm start`    | Start the API from `apps/api`.                     |
-| `npm test`     | API tests against a disposable MongoDB database.   |
-| `npm run lint` | ESLint over the web app.                           |
+| Command          | Use                                              |
+| ---------------- | ------------------------------------------------ |
+| `npm run dev`    | API and Vite in watch mode.                      |
+| `npm run build`  | Production web build in `apps/web/dist`.         |
+| `npm start`      | Start the API from `apps/api`.                   |
+| `npm test`       | API tests against a disposable MongoDB database. |
+| `npm run lint`   | ESLint over the web app.                         |
 | `npm run verify` | Lint, API tests, and the web build in one gate.  |
-| `npm run deploy` | Build, publish to nginx, restart the API.       |
+| `npm run deploy` | Build, publish to nginx, restart the API.        |
 
 ## Safety
 
