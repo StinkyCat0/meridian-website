@@ -1,6 +1,15 @@
 @import "tailwindcss";
 @config "../tailwind.config.js";
 
+/* Tailwind 4 preflight uses cursor: default for buttons; preserve the v3
+   interactive affordance for real buttons and ARIA buttons. */
+@layer base {
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+}
+
 /* ✅ Smooth scrolling for anchor links */
 html {
   scroll-behavior: smooth;
