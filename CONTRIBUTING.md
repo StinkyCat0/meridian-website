@@ -23,8 +23,11 @@ Node.js 22+ and MongoDB. Never commit `.env` files or real credentials.
 
 ## Required checks
 
+- `npm run verify` runs all three checks below in order.
 - `npm run lint` for the web app.
-- `npm test` for the API. Tests use `TEST_MONGO_URI` and a disposable database.
+- `npm test` for the API. Tests use `TEST_MONGO_URI` (or the local
+  `meridian_website_test` database) and refuse to drop any database whose name does not end in
+  `_test`.
 - `npm run build` for the web app.
 - CodeQL runs on pull requests and `main`.
 - No new dependency without the reason in the PR description.

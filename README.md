@@ -57,6 +57,7 @@ Neither bridge is required to run the site. See [docs/INTEGRATION.md](docs/INTEG
 | `npm start`    | Start the API from `apps/api`.                     |
 | `npm test`     | API tests against a disposable MongoDB database.   |
 | `npm run lint` | ESLint over the web app.                           |
+| `npm run verify` | Lint, API tests, and the web build in one gate.  |
 | `npm run deploy` | Build, publish to nginx, restart the API.       |
 
 ## Safety
