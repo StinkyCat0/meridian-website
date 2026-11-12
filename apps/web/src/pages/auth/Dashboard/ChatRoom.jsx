@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { io } from 'socket.io-client';
 import { motion } from 'framer-motion'; // ← Required for <motion.aside>
+import { apiUrl, assetUrl, socketOrigin, getToken } from '../../../lib/api';
 import { 
   Send, Paperclip, Smile, MoreVertical, Image as ImageIcon, 
   File as FileIcon, X, ChevronDown, Plus, Minus, Reply, 
@@ -47,14 +48,14 @@ export default function ChatRoom() {
   const isSidebarExpanded = sidebarOpen || isHoveringSidebar;
 
   useEffect(() => {
-    const token = localStorage.getItem('meridian_token');
+    const token = getToken();
     if (!token) {
       navigate('/login');
       return;
     }
 
     // Fetch user
-    fetch('https://meridianstudios.org/api/auth/me', {
+    fetch(apiUrl('/auth/me'), {
       headers: { 'Authorization': `Bearer ${token}` }
     })
       .then(res => res.json())
@@ -87,7 +88,7 @@ export default function ChatRoom() {
   }, [navigate, selectedRoom]);
 
   const connectSocket = (token, userData) => {
-    socketRef.current = io('https://meridianstudios.org', {
+    socketRef.current = io(socketOrigin(), {
       auth: { token },
       transports: ['websocket'],
     });
@@ -144,7 +145,7 @@ export default function ChatRoom() {
 
   const fetchMessages = async (token, roomId) => {
     try {
-      const res = await fetch(`https://meridianstudios.org/api/chat/${roomId}/messages?includeReplies=true`, {
+      const res = await fetch(apiUrl(`/chat/${roomId}/messages?includeReplies=true`), {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const data = await res.json();
@@ -161,7 +162,7 @@ export default function ChatRoom() {
     e.preventDefault();
     if ((!newMessage.trim() && !selectedAttachment) || !user) return;
 
-    const token = localStorage.getItem('meridian_token');
+    const token = getToken();
     try {
       let attachment = selectedAttachment;
       
@@ -211,9 +212,9 @@ export default function ChatRoom() {
       setReplyingTo(null);
       scrollToBottom();
 
-      const url = messageData.parentId 
-        ? `https://meridianstudios.org/api/chat/messages/${messageData.parentId}/reply`
-        : `https://meridianstudios.org/api/chat/${selectedRoom}/messages`;
+      const url = messageData.parentId
+        ? apiUrl(`/chat/messages/${messageData.parentId}/reply`)
+        : apiUrl(`/chat/${selectedRoom}/messages`);
       
       const res = await fetch(url, {
         method: 'POST',
@@ -247,7 +248,7 @@ export default function ChatRoom() {
     formData.append('file', file);
 
     try {
-      const res = await fetch('https://meridianstudios.org/api/chat/upload', {
+      const res = await fetch(apiUrl('/chat/upload'), {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` },
         body: formData,
@@ -264,9 +265,9 @@ export default function ChatRoom() {
   };
 
   const handleReaction = async (messageId, emoji) => {
-    const token = localStorage.getItem('meridian_token');
+    const token = getToken();
     try {
-      const res = await fetch(`https://meridianstudios.org/api/chat/messages/${messageId}/react`, {
+      const res = await fetch(apiUrl(`/chat/messages/${messageId}/react`), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -545,14 +546,14 @@ export default function ChatRoom() {
                     <div key={i} className="mb-2">
                       {att.type === 'image' ? (
                         <img 
-                          src={att.previewUrl || att.url} 
+                          src={assetUrl(att.url || att.previewUrl)} 
                           alt={att.filename}
                           className="max-w-full rounded-lg cursor-pointer hover:opacity-90 transition-opacity border border-white/10"
-                          onClick={() => window.open(att.url, '_blank')}
+                          onClick={() => window.open(assetUrl(att.url || att.previewUrl), '_blank')}
                         />
                       ) : (
                         <a 
-                          href={att.url} 
+                          href={assetUrl(att.url || att.previewUrl)} 
                           target="_blank" 
                           rel="noopener noreferrer"
                           className="flex items-center gap-2 p-3 bg-white/5 rounded-lg hover:bg-white/10 transition-colors border border-glass-border"

@@ -1,8 +1,9 @@
 // src/pages/Login.jsx - FINAL PRODUCTION VERSION
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Lock, ShieldCheck, ArrowRight, Mail } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { apiUrl, CRM_URL } from '../../lib/api';
 
 export default function Login() {
   const [form, setForm] = useState({ email: '', password: '' });
@@ -11,28 +12,13 @@ export default function Login() {
   const [forgotMode, setForgotMode] = useState(false);
   const navigate = useNavigate();
 
-  // 🔑 CRITICAL: Empty string = relative paths (production)
-  // This ensures fetch("/api/auth/login") not fetch("http://localhost:2000/api/auth/login")
-  const API_BASE = import.meta.env.VITE_API_URL || '';
-
-  // 🔍 DEBUG: Log at component mount (remove in final production)
-  useEffect(() => {
-    console.log('🔍 Login.jsx MOUNTED');
-    console.log('🔍 API_BASE value:', JSON.stringify(API_BASE));
-    console.log('🔍 Fetch URL will be:', `${API_BASE}/api/auth/login`);
-  }, []);
-
   const handleLogin = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError('');
     
     try {
-      // 🔑 CRITICAL: Relative path - nginx will proxy /api/* to backend:2000
-      const fetchUrl = `${API_BASE}/api/auth/login`;
-      console.log('🔍 Fetching:', fetchUrl);
-      
-      const res = await fetch(fetchUrl, {
+      const res = await fetch(apiUrl('/auth/login'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -54,13 +40,6 @@ export default function Login() {
         setError(data.message || 'Invalid email or password');
       }
     } catch (err) {
-      console.error('❌ Login error:', {
-        name: err.name,
-        message: err.message,
-        fetchUrl: `${API_BASE}/api/auth/login`,
-        API_BASE: JSON.stringify(API_BASE)
-      });
-      
       // User-friendly error messages
       if (err.name === 'TypeError' && err.message.includes('fetch')) {
         setError('Cannot connect to server. Is the backend running?');
@@ -78,10 +57,7 @@ export default function Login() {
     setError('');
     
     try {
-      const fetchUrl = `${API_BASE}/api/auth/forgot-password`;
-      console.log('🔍 Fetching:', fetchUrl);
-      
-      const res = await fetch(fetchUrl, {
+      const res = await fetch(apiUrl('/auth/forgot-password'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: form.email })
@@ -95,8 +71,7 @@ export default function Login() {
       } else {
         setError(data.message || 'Failed to send reset link');
       }
-    } catch (err) {
-      console.error('❌ Forgot password error:', err);
+    } catch {
       setError('Cannot connect to server. Please try again.');
     } finally {
       setLoading(false);
@@ -252,6 +227,14 @@ export default function Login() {
           <p className="text-slate-600 text-[10px] uppercase font-black tracking-widest">
             Authorized Personnel Only • IP Logged
           </p>
+          {CRM_URL && (
+            <a
+              href={`${CRM_URL}/login`}
+              className="inline-block mt-4 text-[10px] text-slate-400 hover:text-white font-bold uppercase tracking-wider transition-colors"
+            >
+              Team login
+            </a>
+          )}
         </div>
       </motion.div>
     </div>
