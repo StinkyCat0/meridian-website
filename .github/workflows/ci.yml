@@ -21,10 +21,10 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -39,22 +39,37 @@ jobs:
         run: npm run build -w @meridian/website-web
 
       - name: Upload web build
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: web-dist
           path: apps/web/dist
           retention-days: 7
 
   api:
-    name: API syntax
+    name: API tests
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
+    services:
+      mongo:
+        image: mongo:7
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'db.adminCommand({ ping: 1 })'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      NODE_ENV: test
+      TEST_MONGO_URI: mongodb://127.0.0.1:27017/meridian_website_test
+      JWT_SECRET: ci-test-only-secret-not-used-in-production-0123456789
+      EMAIL_ENABLED: 'false'
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -62,7 +77,5 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Check JavaScript syntax
-        run: |
-          find apps/api -name '*.js' -not -path '*/node_modules/*' -print0 \
-            | xargs -0 -n1 node --check
+      - name: Run API tests
+        run: npm test -w @meridian/website-api
