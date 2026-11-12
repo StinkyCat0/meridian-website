@@ -2,7 +2,8 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { LogOut, ShieldCheck, Mail, MessageSquare, CreditCard } from 'lucide-react';
+import { LogOut, ShieldCheck, Mail, MessageSquare, CreditCard, ExternalLink } from 'lucide-react';
+import { CRM_URL } from '../../../lib/api';
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -67,6 +68,14 @@ export default function Dashboard() {
               <p className="text-sm font-medium">{user?.name}</p>
               <p className="text-[10px] text-slate-500 uppercase tracking-widest">{user?.role}</p>
             </div>
+            {CRM_URL && (
+              <a
+                href={`${CRM_URL}/`}
+                className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-indigo-400 hover:text-indigo-300 transition-colors"
+              >
+                <ExternalLink size={14} /> Open CRM
+              </a>
+            )}
             <button 
               onClick={handleLogout}
               className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-white transition-colors"

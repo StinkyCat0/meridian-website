@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { apiUrl, getToken } from '../../../lib/api';
 import { Check, CreditCard, Shield, Zap, AlertCircle } from 'lucide-react';
 
 export default function Billing() {
@@ -12,14 +13,14 @@ export default function Billing() {
   const [processingPlan, setProcessingPlan] = useState(null);
 
   useEffect(() => {
-    const token = localStorage.getItem('meridian_token');
+    const token = getToken();
     if (!token) {
       navigate('/login');
       return;
     }
 
     // Fetch user profile
-    fetch('https://meridianstudios.org/api/auth/me', {
+    fetch(apiUrl('/auth/me'), {
       headers: { 'Authorization': `Bearer ${token}` }
     })
       .then(res => res.json())
@@ -39,8 +40,8 @@ export default function Billing() {
     setError('');
     
     try {
-      const token = localStorage.getItem('meridian_token');
-      const res = await fetch('https://meridianstudios.org/api/stripe/create-checkout-session', {
+      const token = getToken();
+      const res = await fetch(apiUrl('/stripe/create-checkout-session'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -67,8 +68,8 @@ export default function Billing() {
 
   const handleManageSubscription = async () => {
     try {
-      const token = localStorage.getItem('meridian_token');
-      const res = await fetch('https://meridianstudios.org/api/stripe/create-portal-session', {
+      const token = getToken();
+      const res = await fetch(apiUrl('/stripe/create-portal-session'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

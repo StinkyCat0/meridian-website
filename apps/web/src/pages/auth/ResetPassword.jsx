@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Lock, ShieldCheck, ArrowRight, AlertCircle, CheckCircle, Loader } from 'lucide-react';
+import { apiUrl } from '../../lib/api';
 
 export default function ResetPassword() {
   const navigate = useNavigate();
@@ -57,7 +58,7 @@ export default function ResetPassword() {
     }
 
     try {
-      const res = await fetch('https://meridianstudios.org/api/auth/reset-password', {
+      const res = await fetch(apiUrl('/auth/reset-password'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

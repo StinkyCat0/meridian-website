@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import { apiUrl, getToken } from '../../../lib/api';
 import { 
   Plus, Trash2, Edit2, Lock, Users, ArrowLeft, Save, X, 
   PanelLeftClose, Hash, MessageSquare 
@@ -18,13 +19,13 @@ export default function AdminChatRooms() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
   useEffect(() => {
-    const token = localStorage.getItem('meridian_token');
+    const token = getToken();
     if (!token) {
       navigate('/login');
       return;
     }
 
-    fetch('https://meridianstudios.org/api/chat/rooms', {
+    fetch(apiUrl('/chat/rooms'), {
       headers: { 'Authorization': `Bearer ${token}` }
     })
       .then(res => res.json())
@@ -38,12 +39,12 @@ export default function AdminChatRooms() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const token = localStorage.getItem('meridian_token');
+    const token = getToken();
     
     try {
       const url = editingRoom 
-        ? `https://meridianstudios.org/api/chat/rooms/${editingRoom.id}`
-        : 'https://meridianstudios.org/api/chat/rooms';
+        ? apiUrl(`/chat/rooms/${editingRoom.id}`)
+        : apiUrl('/chat/rooms');
       
       const method = editingRoom ? 'PUT' : 'POST';
       
@@ -77,9 +78,9 @@ export default function AdminChatRooms() {
   const handleDelete = async (roomId) => {
     if (!window.confirm('Delete this room? All messages will be archived.')) return;
     
-    const token = localStorage.getItem('meridian_token');
+    const token = getToken();
     try {
-      const res = await fetch(`https://meridianstudios.org/api/chat/rooms/${roomId}`, {
+      const res = await fetch(apiUrl(`/chat/rooms/${roomId}`), {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });

@@ -11,6 +11,7 @@ import RootHome from './pages/Home';
 import Login from './pages/auth/Login';
 import Dashboard from './pages/auth/Dashboard';
 import ResetPassword from './pages/auth/ResetPassword';
+import VerifyEmail from './pages/auth/VerifyEmail';
 import Billing from './pages/auth/Dashboard/Billing';
 import ChatRoom from './pages/auth/Dashboard/ChatRoom';
 import AdminChatRooms from './pages/auth/Dashboard/AdminChatRooms';
@@ -54,6 +55,7 @@ const App = () => {
   const hideLayout = location.pathname === '/dashboard' || 
                      location.pathname === '/login' || 
                      location.pathname === '/reset-password' ||
+                     location.pathname === '/verify-email' ||
                      location.pathname.startsWith('/dashboard/chat');
 
   const demoLinks = [
@@ -158,6 +160,7 @@ const App = () => {
           <Route path="/login" element={<Login />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/reset-password" element={<ResetPassword />} />
+          <Route path="/verify-email" element={<VerifyEmail />} />
           <Route path="/dashboard/billing" element={<Billing />} />
           <Route path="/dashboard/chat" element={<ChatRoom />} />
           <Route path="/dashboard/chat/admin" element={<AdminChatRooms />} />
