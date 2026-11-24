@@ -1,7 +1,21 @@
 // Best-effort bridge from the public website contact form into the CRM.
 const DEFAULT_TIMEOUT_MS = 5000;
 
-async function forwardContactToCrm({ name, email, subject, message, source } = {}) {
+function readDealId(body) {
+  if (!body || typeof body !== "object") return null;
+  const candidate = body.id || body.dealId;
+  return typeof candidate === "string" && candidate.trim()
+    ? candidate.trim()
+    : null;
+}
+
+async function forwardContactToCrm({
+  name,
+  email,
+  subject,
+  message,
+  source,
+} = {}) {
   const url = process.env.CRM_INTAKE_URL;
   const secret = process.env.CRM_INTAKE_SECRET;
 
@@ -10,23 +24,34 @@ async function forwardContactToCrm({ name, email, subject, message, source } = {
   const timeout = Number(process.env.CRM_TIMEOUT_MS) || DEFAULT_TIMEOUT_MS;
 
   const response = await fetch(url, {
-    method: 'POST',
+    method: "POST",
     headers: {
-      'Content-Type': 'application/json',
-      'X-Meridian-Intake-Secret': secret,
+      "Content-Type": "application/json",
+      "X-Meridian-Intake-Secret": secret,
     },
     body: JSON.stringify({ name, email, subject, message, source }),
     signal: AbortSignal.timeout(timeout),
   });
 
   if (!response.ok) {
-    const error = new Error(`CRM intake rejected the contact with status ${response.status}`);
+    const error = new Error(
+      `CRM intake rejected the contact with status ${response.status}`,
+    );
     error.status = response.status;
     error.statusCode = response.status;
     throw error;
   }
 
-  return { ok: true, status: response.status };
+  // The documented success body is 201 { "id": "<deal>" }. A malformed or
+  // empty body must not fail the contact submission; the deal id stays null.
+  let body = null;
+  try {
+    body = await response.json();
+  } catch {
+    body = null;
+  }
+
+  return { ok: true, status: response.status, dealId: readDealId(body) };
 }
 
 module.exports = { forwardContactToCrm };

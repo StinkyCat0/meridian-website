@@ -43,14 +43,16 @@ React 18 with React Router, framer-motion, Tailwind, and socket.io-client.
 
 Express 5 with CommonJS modules.
 
-| Area       | Files                                             | Responsibility                                                    |
-| ---------- | ------------------------------------------------- | ----------------------------------------------------------------- |
-| Server     | `server.js`                                       | HTTP composition, Socket.io, CORS, static uploads, shutdown.      |
-| Auth       | `routes/auth.js`, `models/User.js`, `middleware/` | Register, verify, login, reset, profile, JWT protection.          |
-| Contact    | `routes/contact.js`, `models/Message.js`          | Persist inquiries, notify by email, forward to the CRM.           |
-| Chat       | `routes/chat.js`, `models/ChatRoom.js`, `models/ChatMessage.js` | Rooms, messages, threads, reactions, uploads, realtime events. |
-| Email      | `utils/emailService.js`                           | Lazy SMTP transport; disabled cleanly in tests and local runs.    |
-| Integration| `utils/crmIntake.js`, `utils/tokens.js`           | CRM lead forwarding and website JWT claims.                       |
+| Area        | Files                                                           | Responsibility                                                 |
+| ----------- | --------------------------------------------------------------- | -------------------------------------------------------------- |
+| Server      | `server.js`                                                     | HTTP composition, Socket.io, CORS, static uploads, shutdown.   |
+| Auth        | `routes/auth.js`, `models/User.js`, `middleware/`               | Register, verify, login, reset, profile, JWT protection.       |
+| Contact     | `routes/contact.js`, `models/Message.js`                        | Persist inquiries, notify by email, forward to the CRM.        |
+| Chat        | `routes/chat.js`, `models/ChatRoom.js`, `models/ChatMessage.js` | Rooms, messages, threads, reactions, uploads, realtime events. |
+| Email       | `utils/emailService.js`                                         | Lazy SMTP transport; disabled cleanly in tests and local runs. |
+| Integration | `utils/crmIntake.js`, `utils/tokens.js`                         | CRM lead forwarding and website JWT claims.                    |
+| Studio      | `routes/studio.js`, `middleware/studioAuth.js`                  | Service-token API for the CRM Studio admin surfaces.           |
+| Demos       | `routes/demos.js`, `models/DemoVisit.js`                        | Public demo visit counters shared with the Studio.             |
 
 ## Data
 
@@ -58,9 +60,13 @@ MongoDB database `meridian`:
 
 - `users` — the existing login schema: name, email, bcrypt password, role, verification and reset
   tokens, lockout state, access flags, subscription fields, profile fields, timestamps.
-- `messages` — contact-form inquiries with `new` / `read` / `archived` status.
+- `messages` — contact-form inquiries with `new` / `read` / `archived` status, timestamps for the
+  status transitions, and the optional CRM `crmDealId` returned by intake.
 - `chatrooms` — named support rooms with read-only and archive flags.
 - `chatmessages` — room messages, threaded replies, attachments, reactions, read receipts.
+- `crmhandoffs` — one-time login handoff hashes with a 60-second TTL; the raw code is never stored.
+- `demovisits` — one counter document per static demo (`key` unique) with `visits` and
+  `lastVisitedAt`.
 
 Indexes are declared on the fields used by list and thread queries. Room and message writes are
 scoped by the authenticated user; admin-only operations check the role from the database record, not
@@ -74,6 +80,11 @@ from a client payload.
 - Contact messages are stored before any email or CRM call, so a mail failure never loses a lead.
 - Chat uploads accept only images and PDFs up to 10 MB and are served from a dedicated path.
 - CORS is an explicit allowlist (`FRONTEND_URL`), not a reflection of any origin.
+- `/api/studio/*` is server-to-server only: a constant-time service-token check, 120 requests/minute,
+  and dedicated serializers that never emit passwords, tokens, or Stripe customer ids. The Studio is
+  disabled (503) until `STUDIO_API_TOKEN` is at least 32 characters.
+- CRM login handoff codes are 32 random bytes; only their SHA-256 hash is persisted, with a
+  60-second TTL. Consumption is an atomic `usedAt` claim, so replay loses the race.
 
 ## Deliberate boundaries
 
@@ -82,4 +93,5 @@ from a client payload.
   resolves to one of its own users and workspace memberships.
 - The website has no payment backend. The Billing screen is a presentation surface; no Stripe
   secret is used here.
-- Demo sites are static React routes; they do not call the API.
+- Demo sites are static React routes; only the home page reads visit counters from `/api/demos` and
+  reports a ping, so the demo pages themselves stay independent of the API.

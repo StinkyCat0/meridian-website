@@ -52,17 +52,34 @@ The CRM keeps its own workspace members and roles in its own database. Integrati
 
 Neither bridge is required to run the site. See [docs/INTEGRATION.md](docs/INTEGRATION.md).
 
+## CRM Studio service API
+
+The CRM's Studio admin surfaces call this API server-to-server under `/api/studio/*` with an
+`x-meridian-studio-token` header. Set `STUDIO_API_TOKEN` (32+ characters) and `CRM_URL` in
+`apps/api/.env`; the routes answer `503` until the token is configured, and the one-time login
+handoff is `POST /api/auth/crm-handoff`. Public demo visit counters live at `/api/demos`.
+
+For local demo data (users, rooms, messages, inquiries, and visit counts):
+
+```bash
+npm run seed:demo
+```
+
+The seed is idempotent and refuses `NODE_ENV=production` or a non-local MongoDB unless
+`SEED_DEMO_ALLOW_REMOTE=1`.
+
 ## Commands
 
-| Command          | Use                                              |
-| ---------------- | ------------------------------------------------ |
-| `npm run dev`    | API and Vite in watch mode.                      |
-| `npm run build`  | Production web build in `apps/web/dist`.         |
-| `npm start`      | Start the API from `apps/api`.                   |
-| `npm test`       | API tests against a disposable MongoDB database. |
-| `npm run lint`   | ESLint over the web app.                         |
-| `npm run verify` | Lint, API tests, and the web build in one gate.  |
-| `npm run deploy` | Build, publish to nginx, restart the API.        |
+| Command             | Use                                              |
+| ------------------- | ------------------------------------------------ |
+| `npm run dev`       | API and Vite in watch mode.                      |
+| `npm run build`     | Production web build in `apps/web/dist`.         |
+| `npm start`         | Start the API from `apps/api`.                   |
+| `npm test`          | API tests against a disposable MongoDB database. |
+| `npm run seed:demo` | Local-only idempotent demo data for Studio.      |
+| `npm run lint`      | ESLint over the web app.                         |
+| `npm run verify`    | Lint, API tests, and the web build in one gate.  |
+| `npm run deploy`    | Build, publish to nginx, restart the API.        |
 
 ## Safety
 
