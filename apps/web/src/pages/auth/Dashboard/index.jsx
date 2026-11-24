@@ -3,12 +3,14 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { LogOut, ShieldCheck, Mail, MessageSquare, CreditCard, ExternalLink } from 'lucide-react';
-import { CRM_URL } from '../../../lib/api';
+import { CRM_URL, requestCrmHandoff } from '../../../lib/api';
 
 export default function Dashboard() {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [crmLoading, setCrmLoading] = useState(false);
+  const [crmError, setCrmError] = useState('');
 
   useEffect(() => {
     // Get user from localStorage (set during login)
@@ -35,6 +37,24 @@ export default function Dashboard() {
     localStorage.removeItem('meridian_token');
     localStorage.removeItem('meridian_user');
     navigate('/login');
+  };
+
+  const canUseCrm = user?.access?.canAccessCrm === true || user?.role === 'admin';
+
+  const handleOpenCrm = async () => {
+    if (crmLoading) return;
+    setCrmError('');
+    setCrmLoading(true);
+
+    try {
+      const { url } = await requestCrmHandoff();
+      window.location.assign(url);
+      return;
+    } catch (err) {
+      setCrmError(err?.message || 'Unable to start the CRM handoff.');
+    } finally {
+      setCrmLoading(false);
+    }
   };
 
   if (loading) {
@@ -68,13 +88,15 @@ export default function Dashboard() {
               <p className="text-sm font-medium">{user?.name}</p>
               <p className="text-[10px] text-slate-500 uppercase tracking-widest">{user?.role}</p>
             </div>
-            {CRM_URL && (
-              <a
-                href={`${CRM_URL}/`}
-                className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-indigo-400 hover:text-indigo-300 transition-colors"
+            {CRM_URL && canUseCrm && (
+              <button
+                type="button"
+                onClick={handleOpenCrm}
+                disabled={crmLoading}
+                className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-indigo-400 hover:text-indigo-300 transition-colors disabled:opacity-50 disabled:cursor-wait"
               >
-                <ExternalLink size={14} /> Open CRM
-              </a>
+                <ExternalLink size={14} /> {crmLoading ? 'Opening…' : 'Open CRM'}
+              </button>
             )}
             <button 
               onClick={handleLogout}
@@ -84,6 +106,19 @@ export default function Dashboard() {
             </button>
           </div>
         </div>
+        {crmError && (
+          <div className="border-t border-rose-500/20 bg-rose-500/5">
+            <div className="max-w-7xl mx-auto px-6 py-2 flex flex-wrap items-center justify-between gap-2">
+              <p className="text-[10px] font-black uppercase tracking-widest text-rose-300">{crmError}</p>
+              <a
+                href={`${CRM_URL}/`}
+                className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-indigo-400 hover:text-indigo-300 transition-colors"
+              >
+                <ExternalLink size={12} /> Continue to CRM
+              </a>
+            </div>
+          </div>
+        )}
       </header>
 
       {/* Main Content */}
@@ -144,6 +179,23 @@ export default function Dashboard() {
               <h3 className="font-bold uppercase tracking-tight mb-2">Team Chat</h3>
               <p className="text-slate-400 text-sm">Discord-style real-time messaging with Socket.io</p>
             </motion.div>
+
+            {/* 🏢 CRM Card - staff-only handoff into the operations workspace */}
+            {CRM_URL && canUseCrm && (
+              <motion.div
+                whileHover={{ y: -4 }}
+                className="bg-slate-900/40 backdrop-blur-xl border border-white/5 rounded-[1.5rem] p-6 cursor-pointer hover:border-cyan-500/50 transition-colors"
+                onClick={handleOpenCrm}
+              >
+                <div className="w-12 h-12 bg-cyan-600/20 rounded-xl flex items-center justify-center mb-4">
+                  <ExternalLink className="text-cyan-400" size={24} />
+                </div>
+                <h3 className="font-bold uppercase tracking-tight mb-2">Meridian CRM</h3>
+                <p className="text-slate-400 text-sm">
+                  Open the staff operations workspace with a one-time secure link.
+                </p>
+              </motion.div>
+            )}
 
             {/* ⚙️ Settings Card */}
             <motion.div 

@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronDown, Sparkles, ArrowLeft, Eye, CreditCard } from 'lucide-react';
 import { useToast } from './hooks/useToast';
 import Toast from './components/ui/Toast';
+import { trackDemoVisit as postDemoVisit } from './lib/api';
 
 // 🔐 Root Auth Pages
 import RootHome from './pages/Home';
@@ -68,7 +69,9 @@ const App = () => {
   useEffect(() => {
     const currentDemo = demoLinks.find(d => location.pathname.startsWith(d.path));
     if (currentDemo) {
+      // Local counter stays as an offline fallback; the API call never blocks navigation.
       trackDemoVisit(currentDemo.key);
+      postDemoVisit(currentDemo.key).catch(() => {});
     }
   }, [location.pathname]);
 

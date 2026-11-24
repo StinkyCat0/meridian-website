@@ -3,9 +3,16 @@ import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { ArrowRight, Sparkles, Code, Palette, Heart, Shirt, Eye } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { fetchDemos } from '../lib/api';
 
 // Helper: Get visit count from localStorage
 const getVisits = (key) => parseInt(localStorage.getItem(`meridian_demo_visits_${key}`) || '0', 10);
+const LOCAL_VISITS = () => ({
+  bakery: getVisits('bakery'),
+  luxesm: getVisits('luxesm'),
+  dental: getVisits('dental'),
+  corrowear: getVisits('corrowear')
+});
 
 // ✈️ Little plane that flies across the top of the screen
 const FlyingPlane = () => {
@@ -52,13 +59,24 @@ const Home = () => {
   const [visitCounts, setVisitCounts] = useState({});
 
   useEffect(() => {
-    // Load visit counts on mount
-    setVisitCounts({
-      bakery: getVisits('bakery'),
-      luxesm: getVisits('luxesm'),
-      dental: getVisits('dental'),
-      corrowear: getVisits('corrowear')
-    });
+    let cancelled = false;
+
+    fetchDemos()
+      .then((items) => {
+        if (cancelled) return;
+        const counts = LOCAL_VISITS();
+        items.forEach((demo) => {
+          if (demo?.key) counts[demo.key] = Number(demo.visits) || 0;
+        });
+        setVisitCounts(counts);
+      })
+      .catch(() => {
+        if (!cancelled) setVisitCounts(LOCAL_VISITS());
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const demos = [
