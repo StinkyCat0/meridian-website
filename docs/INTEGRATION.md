@@ -138,6 +138,23 @@ through `/api/studio/demos`. The local-only demo seed (`npm run seed:demo` in `a
 idempotent and refuses `NODE_ENV=production` or a non-local `MONGO_URI` unless
 `SEED_DEMO_ALLOW_REMOTE=1`.
 
+## Website login screen
+
+The public `/login` form is the Meridian website identity form, restyled to match the CRM. It still
+calls `POST /api/auth/login`; MongoDB users, bcrypt hashes, JWTs, lockouts, verification, and
+password reset are unchanged. After login:
+
+- an account with `isVerified` + `access.canAccessCrm` requests `/api/auth/crm-handoff` and is
+  redirected to the CRM one-time link;
+- a customer account goes to `/dashboard` as before;
+- if the handoff is unavailable, staff stay on the website dashboard and can retry from the
+  Meridian CRM card.
+
+`npm run seed:demo -w @meridian/website-api` creates local-only `demo@meridian.studio` and
+`member@meridian.studio` (password `Meridian2026!`) with CRM access, matching the CRM demo
+workspace. The development-only **Use dev account** button is enabled by
+`VITE_DEV_LOGIN_EMAIL`/`VITE_DEV_LOGIN_PASSWORD`; production builds omit it.
+
 ## What is intentionally not shared
 
 - Chat rooms and messages stay a website support surface. The Studio may moderate rooms and post

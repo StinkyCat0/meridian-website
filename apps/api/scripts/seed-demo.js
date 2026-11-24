@@ -13,7 +13,7 @@ const ChatRoom = require("../models/ChatRoom");
 const ChatMessage = require("../models/ChatMessage");
 const DemoVisit = require("../models/DemoVisit");
 
-const DEMO_PASSWORD = process.env.DEMO_SEED_PASSWORD || "DemoPass123!";
+const DEMO_PASSWORD = process.env.DEMO_SEED_PASSWORD || "Meridian2026!";
 
 function isLocalMongo(uri) {
   if (typeof uri !== "string" || !/^mongodb:\/\//i.test(uri)) return false;
@@ -171,13 +171,13 @@ async function main() {
 
   const admin = await upsertDemoUser({
     name: "Demo Admin",
-    email: "demo.admin@meridianstudios.test",
+    email: "demo@meridian.studio",
     role: "admin",
     userAccess: { canAccessPremiumFeatures: true, canAccessCrm: true },
   });
   const staff = await upsertDemoUser({
     name: "Demo Staff",
-    email: "demo.staff@meridianstudios.test",
+    email: "member@meridian.studio",
     role: "user",
     userAccess: { canAccessPremiumFeatures: true, canAccessCrm: true },
   });

@@ -52,6 +52,19 @@ The CRM keeps its own workspace members and roles in its own database. Integrati
 
 Neither bridge is required to run the site. See [docs/INTEGRATION.md](docs/INTEGRATION.md).
 
+## Website login
+
+`/login` remains the Meridian website identity form: it posts to `POST /api/auth/login`, so MongoDB
+users, bcrypt hashes, JWT expiry, lockouts, and verification work exactly as before. The UI now
+matches the CRM sign-in surface. After a successful sign-in, a verified account with
+`access.canAccessCrm` is redirected through the one-time CRM handoff; customers continue to
+`/dashboard`.
+
+For local development, `npm run seed:demo -w @meridian/website-api` creates
+`demo@meridian.studio` / `Meridian2026!` (admin, CRM access) and `member@meridian.studio` /
+`Meridian2026!` (staff, CRM access). Set `VITE_DEV_LOGIN_EMAIL` and `VITE_DEV_LOGIN_PASSWORD` in
+`apps/web/.env.local` to render the development-only **Use dev account** button.
+
 ## CRM Studio service API
 
 The CRM's Studio admin surfaces call this API server-to-server under `/api/studio/*` with an
